@@ -17,22 +17,29 @@ using namespace std;
     #define GetCurrentDir getcwd
 #endif
 
-typedef vector< tuple<unsigned int,unsigned char> > tuple_vector;
-
-struct node{
-    tuple<unsigned int,unsigned char> dataTuple;
-    node* left;
-    node* right;
+typedef struct node{
+    unsigned int dataFrequency;
+    unsigned char dataByte;
+    bool internal;
+    node left;
+    node right;
 }node;
+
+typedef vector< tuple<unsigned int,unsigned char, bool> > tuple_vector;
+
 
 int treatAsText(ifstream &inputFile);
 
+node* makeHeap(tuple_vector &sortedTupleVector);
 tuple_vector buildFrequencies(ifstream &inputFile, int bytes);
-tuple_vector sortTupleVector(tuple_vector &tupleList);
-int findInTupleVector(tuple_vector tupleList, unsigned char character);
-void incrementCharInTupleVector(tuple_vector &tupleList, int indexOfChar);
-void appendNewCharInTupleVector(tuple_vector &tupleList, unsigned char character);
-void printTupleVector(tuple_vector &tupleList);
+tuple_vector sortTupleVector(tuple_vector &tupleVector);
+int findInTupleVector(tuple_vector tupleVector, unsigned char character);
+void incrementCharInTupleVector(tuple_vector &tupleVector, int indexOfChar);
+void appendNewCharInTupleVector(tuple_vector &tupleVector, unsigned char character);
+void insertInSortedTupleVector(tuple_vector &sortedTupleVector, unsigned int value);
+void eraseInSortedTupleVector(tuple_vector &sortedTupleVector, unsigned int value);
+void linkNodesToHeadNode(node* head, node* left, node* right);
+void printTupleVector(tuple_vector &tupleVector);
 
 int main(int argc, char* argv[]) {
     ifstream inputFile;
@@ -76,6 +83,7 @@ int treatAsText(ifstream &inputFile){
     tuple_vector frequencyTupleVector = buildFrequencies(inputFile, 1);
     frequencyTupleVector = sortTupleVector(frequencyTupleVector);
 
+    makeHeap(frequencyTupleVector);
     return 0;
 }
 
@@ -103,50 +111,55 @@ tuple_vector buildFrequencies(ifstream &inputFile, int bytes){
     return frequencyTupleVector;
 }
 
-int findInTupleVector(tuple_vector tupleList, unsigned char character){
-    unsigned int sizeOfList = static_cast<unsigned int>(tupleList.size());
+int findInTupleVector(tuple_vector tupleVector, unsigned char character){
+    unsigned int sizeOfList = static_cast<unsigned int>(tupleVector.size());
     for(unsigned int i = 0; i < sizeOfList; i++){
-        if(get<1>(tupleList[i]) == character)
+        if(get<1>(tupleVector[i]) == character)
             return i;
     }
     return -1;
 }
 
-void appendNewCharInTupleVector(tuple_vector &tupleList, unsigned char character){
-    tupleList.push_back(make_tuple(1, character));
+void appendNewCharInTupleVector(tuple_vector &tupleVector, unsigned char character){
+    tupleVector.push_back(make_tuple(1, character, false));
 }
-void incrementCharInTupleVector(tuple_vector &tupleList, int indexOfChar){
-    int currentFrequency = get<0>(tupleList[indexOfChar]);
-    unsigned char character = get<1>(tupleList[indexOfChar]);
-    tupleList[indexOfChar].operator=(make_tuple(++currentFrequency, character));
+void incrementCharInTupleVector(tuple_vector &tupleVector, int indexOfChar){
+    int currentFrequency = get<0>(tupleVector[indexOfChar]);
+    unsigned char character = get<1>(tupleVector[indexOfChar]);
+    tupleVector[indexOfChar].operator=(make_tuple(++currentFrequency, character, false));
 }
 
-void printTupleVector(tuple_vector &tupleList){
+void printTupleVector(tuple_vector &tupleVector){
     unsigned int currentFrequency;
     unsigned char character;
-    unsigned int sizeOfList = static_cast<unsigned int>(tupleList.size());
+    bool isInternalNode;
+    unsigned int sizeOfList = static_cast<unsigned int>(tupleVector.size());
 
-    cout<<"frequency    character"<<endl;
+    cout<<"frequency    character   internalNode"<<endl;
     for(unsigned int i = 0; i < sizeOfList; i++){  
-        currentFrequency = get<0>(tupleList[i]);
-        character = get<1>(tupleList[i]);
+        currentFrequency = get<0>(tupleVector[i]);
+        character = get<1>(tupleVector[i]);
+        isInternalNode = get<2>(tupleVector[i]);
         cout << currentFrequency;
         cout << "\t";
         cout << "\t";
-        cout << character << endl;
+        cout << character;
+        cout << "\t";
+        cout << "\t";
+        cout << isInternalNode << endl;
     }
 }
 
-tuple_vector sortTupleVector(tuple_vector &tupleList){
-    unsigned int sizeOfList = static_cast<unsigned int>(tupleList.size());
+tuple_vector sortTupleVector(tuple_vector &tupleVector){
+    unsigned int sizeOfList = static_cast<unsigned int>(tupleVector.size());
     vector<int> arrayOfFrequencies;
 
     for(unsigned int i = 0; i < sizeOfList; i++){ 
-        arrayOfFrequencies.push_back(get<0>(tupleList[i]));
+        arrayOfFrequencies.push_back(get<0>(tupleVector[i]));
     }
     sort(arrayOfFrequencies.begin(), arrayOfFrequencies.end());
 
-    tuple_vector sortedVector;
+    tuple_vector sortedTupleVector;
     unsigned int currentFrequency;
     unsigned char character;
 
@@ -154,18 +167,85 @@ tuple_vector sortTupleVector(tuple_vector &tupleList){
     for(unsigned int i = 0; i < sizeOfList; i++){ 
         currentFrequency = arrayOfFrequencies[i];
         for(unsigned int y = 0; y < sizeOfList; y++){ 
-            if(currentFrequency == get<0>(tupleList[y])) {
-                character = get<1>(tupleList[y]);
-                sortedVector.push_back(make_tuple(currentFrequency, character));
+            if(currentFrequency == get<0>(tupleVector[y])) {
+                character = get<1>(tupleVector[y]);
+                sortedTupleVector.push_back(make_tuple(currentFrequency, character, false));
             
-                tupleList[y].operator = (make_tuple(0, character));
+                tupleVector[y].operator = (make_tuple(0, character, false));
             }   
         }
     }
 
     #if DEBUG
-        printTupleVector(sortedVector);
+        printTupleVector(sortedTupleVector);
     #endif
 
-    return sortedVector;
+    return sortedTupleVector;
+}
+
+node* makeHeap(tuple_vector &sortedTupleVector){
+    vector<node> nodeList;
+    node head, left, right;
+
+    // while(static_cast<unsigned int>(sortedTupleVector.size()) > 0){
+        if(sortedTupleVector.size() != 1){
+            int lowestFrequency = get<0>(sortedTupleVector[0]);
+            int secondLowestFrequency = get<0>(sortedTupleVector[1]);
+
+            int newValueForNode = lowestFrequency + secondLowestFrequency;
+
+            head = {.dataFrequency = newValueForNode, .internal = true, .left = left, .right = right};
+
+            eraseInSortedTupleVector(sortedTupleVector, lowestFrequency);
+            insertInSortedTupleVector(sortedTupleVector, newValueForNode);
+
+        // }
+    
+    }
+
+
+    return nullptr;
+}
+
+void insertInSortedTupleVector(tuple_vector &sortedTupleVector, unsigned int value){
+    unsigned int sizeOfList = static_cast<unsigned int>(sortedTupleVector.size());
+    tuple_vector::iterator iterator = sortedTupleVector.begin();
+
+    if(get<0>(sortedTupleVector[0]) > value){
+        sortedTupleVector.insert(iterator,make_tuple(value,0,true));
+        return;
+    }
+    
+    for(unsigned int i = 1; i < sizeOfList; i++){
+        if(get<0>(sortedTupleVector[i]) > value){
+            sortedTupleVector.insert(iterator+i,make_tuple(value,0,true));
+            return;
+        }
+    }
+    sortedTupleVector.insert(sortedTupleVector.end(),make_tuple(value,0,true));
+    return;
+}
+
+void eraseInSortedTupleVector(tuple_vector &sortedTupleVector, unsigned int value){
+    unsigned int sizeOfList = static_cast<unsigned int>(sortedTupleVector.size());
+    tuple_vector::iterator iterator = sortedTupleVector.begin();
+    
+    for(unsigned int i = 0; i < sizeOfList; i++){
+        if(get<0>(sortedTupleVector[i]) == value){
+            if(sizeOfList != 1){
+                sortedTupleVector.erase(iterator+i);
+                sortedTupleVector.erase(iterator+i);
+                return;
+            }
+            else {
+                sortedTupleVector.erase(iterator+i);
+                return;
+            }
+        }
+    }
+
+}
+
+void linkNodesToHeadNode(node* head, node* left, node* right){
+
 }
