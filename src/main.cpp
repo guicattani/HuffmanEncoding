@@ -6,6 +6,9 @@ using namespace std;
 #include <algorithm>    // std::sort
 #include <tuple>
 #include <vector>
+#include <stack>          
+#include <unordered_map>   
+#include <bitset>   
 
 #define DEBUG 1
 
@@ -21,14 +24,23 @@ typedef struct node{
     unsigned int dataFrequency;
     unsigned char dataByte;
     bool internal;
-    node left;
-    node right;
+    node *left;
+    node *right;
+
+    node(unsigned char dataByte, unsigned int dataFrequency, bool isInternal){
+        left = NULL;
+        right = NULL;
+        this->internal = isInternal;
+        this->dataFrequency = dataFrequency;
+        this->dataByte = dataByte;
+    }
+
 }node;
 
 typedef vector< tuple<unsigned int,unsigned char, bool> > tuple_vector;
 
 
-int treatAsText(ifstream &inputFile);
+int encodeText(ifstream &inputFile);
 
 node* makeHeap(tuple_vector &sortedTupleVector);
 tuple_vector buildFrequencies(ifstream &inputFile, int bytes);
@@ -36,10 +48,12 @@ tuple_vector sortTupleVector(tuple_vector &tupleVector);
 int findInTupleVector(tuple_vector tupleVector, unsigned char character);
 void incrementCharInTupleVector(tuple_vector &tupleVector, int indexOfChar);
 void appendNewCharInTupleVector(tuple_vector &tupleVector, unsigned char character);
-void insertInSortedTupleVector(tuple_vector &sortedTupleVector, unsigned int value);
-void eraseInSortedTupleVector(tuple_vector &sortedTupleVector, unsigned int value);
-void linkNodesToHeadNode(node* head, node* left, node* right);
 void printTupleVector(tuple_vector &tupleVector);
+void printCodes(node* root, string str);
+void makeMap(node* rootNode, string str, unordered_map<unsigned char, string> &map );
+
+void writeEncodedFile(node* root, ifstream &inputFile, ofstream &outputFile, unordered_map<unsigned char, string> map);
+void writeCodeTable(ofstream &newFile, node* root, string str);
 
 int main(int argc, char* argv[]) {
     ifstream inputFile;
@@ -50,15 +64,19 @@ int main(int argc, char* argv[]) {
      {
         return errno;
      }
-    cCurrentPath[sizeof(cCurrentPath) - 1] = '\0'; /* not really required */
+    cCurrentPath[sizeof(cCurrentPath) - 1] = '\0';
     cout << "The current working directory is "<< cCurrentPath << endl;
-        
+    
+    bool encodeOperation;
     if(argc < 2) {
         cout << "Type path to file: ";
         cin >> fileName;
     }
-    else
-        fileName = argv[1];
+    else if(argc < 3){
+        fileName = argv[2];
+        if(argc < 4)
+            encodeOperation = false;
+    }
 
     inputFile.open (fileName);
 
@@ -67,24 +85,45 @@ int main(int argc, char* argv[]) {
         return -2;
     }
 
-    size_t extensionMark = fileName.find_last_of('.');
+    unsigned int extensionMark = static_cast<unsigned int> (fileName.find_last_of('.'));
     string extension = fileName.substr(extensionMark+1, fileName.length());
 
     if(extension == "txt")
     {
-        treatAsText(inputFile);
+        encodeText(inputFile);
+    }
+    else{
+        cerr << "File is not .txt, exiting" << endl;
     }
     
     inputFile.close();
     return 0;
 }
 
-int treatAsText(ifstream &inputFile){
+int encodeText(ifstream &inputFile){
     tuple_vector frequencyTupleVector = buildFrequencies(inputFile, 1);
     frequencyTupleVector = sortTupleVector(frequencyTupleVector);
 
-    makeHeap(frequencyTupleVector);
+    node* rootNode = makeHeap(frequencyTupleVector);
+    unordered_map<unsigned char, string> mapOfCode;
+    makeMap(rootNode, "", mapOfCode);
+
+    ofstream outputFile;
+    outputFile.open("output.dat",ios_base::binary);
+    writeEncodedFile(rootNode, inputFile, outputFile, mapOfCode);
+    outputFile.close();
     return 0;
+}
+
+void makeMap(node* rootNode, string str, unordered_map<unsigned char, string> &map){
+    if (!rootNode)
+        return;
+ 
+    if (!rootNode->internal)
+        map.insert({rootNode->dataByte, str});
+ 
+    makeMap(rootNode->left, str+ "0", map);
+    makeMap(rootNode->right, str + "1",  map);
 }
 
 tuple_vector buildFrequencies(ifstream &inputFile, int bytes){
@@ -184,27 +223,158 @@ tuple_vector sortTupleVector(tuple_vector &tupleVector){
 }
 
 node* makeHeap(tuple_vector &sortedTupleVector){
-    vector<node> nodeList;
-    node head, left, right;
+    stack<node*> nodeStack;
+    stack<node*> nodeDestack;
+    node *head, *left, *right, *dequeue;
 
-    // while(static_cast<unsigned int>(sortedTupleVector.size()) > 0){
-        if(sortedTupleVector.size() != 1){
-            int lowestFrequency = get<0>(sortedTupleVector[0]);
-            int secondLowestFrequency = get<0>(sortedTupleVector[1]);
+    unsigned int tupleVectorSize = static_cast<unsigned int>(sortedTupleVector.size());
 
-            int newValueForNode = lowestFrequency + secondLowestFrequency;
+    for(int i = tupleVectorSize-1; i >= 0; i--){
+        nodeStack.push(new node(get<1>(sortedTupleVector[i]),get<0>(sortedTupleVector[i]),false) );
+    }
+     
+     while(nodeStack.size() > 1){
+        left = nodeStack.top();
+        nodeStack.pop();
 
-            head = {.dataFrequency = newValueForNode, .internal = true, .left = left, .right = right};
+        right = nodeStack.top();
+        nodeStack.pop();
 
-            eraseInSortedTupleVector(sortedTupleVector, lowestFrequency);
-            insertInSortedTupleVector(sortedTupleVector, newValueForNode);
+        unsigned int newFrequencyValue = left->dataFrequency + right->dataFrequency;
 
-        // }
+        head = new node('0',newFrequencyValue, true);
+        head->left = left;
+        head->right = right;
+
+        unsigned int stackSize = nodeStack.size();
+        for(unsigned int i = 0; i < stackSize; i++){
+            dequeue = nodeStack.top();
+            if(dequeue->dataFrequency < newFrequencyValue){
+                nodeDestack.push(dequeue);
+                nodeStack.pop();
+            }
+            else{
+                nodeStack.push(head);
+                break;
+            }
+        }
+        if(nodeStack.size() <= 0 && nodeDestack.size() > 0)
+            nodeStack.push(head);
+
+        while(nodeDestack.size() > 0) {
+            dequeue = nodeDestack.top();
+            nodeStack.push(dequeue);
+            nodeDestack.pop();
+        }
     
     }
+    
+    #if DEBUG
+        printCodes(head,"");
+    #endif
 
+    return head;
+}
 
-    return nullptr;
+void writeEncodedFile(node* root, ifstream &inputFile, ofstream &outputFile, unordered_map<unsigned char, string> map){
+    //writeCodeTable(outputFile, root, "");
+    //outputFile << "\n";
+
+    inputFile.clear();
+    inputFile.seekg(0, ios::beg);
+    char readByte;
+
+    bitset<32> buffer;
+    bitset<32> bufferOfBuffer;
+    unsigned int bufferIterator = 0;
+    bool activateSecondBuffer = false;
+    bool reachedBufferBits = false;
+    bool bufferEmpty = true;
+
+    while(inputFile){
+        inputFile.read(&readByte, 1);
+        unsigned char readCharacter = (unsigned char) readByte;
+        string readString = map[readCharacter];
+        unsigned int sizeOfReadString = readString.size();
+        unsigned int amountOfBitsToWrite;
+        unsigned int leftoverBitsToWrite;
+
+        if(bufferIterator + sizeOfReadString > 32){
+            activateSecondBuffer = true;
+            reachedBufferBits = true;
+            amountOfBitsToWrite = 32 - bufferIterator;
+            leftoverBitsToWrite = sizeOfReadString - amountOfBitsToWrite;
+        }
+        else{
+            amountOfBitsToWrite = sizeOfReadString;
+        }
+
+        for(unsigned int i = 0; i < amountOfBitsToWrite; i++){
+            if(readString[i] == '1')
+                buffer[bufferIterator] = true;
+            else    
+                buffer[bufferIterator] = false;
+            bufferIterator++;
+        }
+
+        if(activateSecondBuffer){
+            for(unsigned int i = 0; i < leftoverBitsToWrite; i++){
+                if(readString[i] == '1')
+                    bufferOfBuffer[i] = true;
+                else    
+                    bufferOfBuffer[i] = false;
+            }   
+        }
+
+        #if DEBUG
+            cout << "read" << readString << endl;
+        #endif
+
+        if(reachedBufferBits){
+            outputFile.write( (char*)&buffer, sizeof(buffer) );
+            bufferEmpty = true;
+            reachedBufferBits = false;
+            bufferIterator = 0;
+            if(activateSecondBuffer){
+                buffer = bufferOfBuffer;
+                bufferIterator = leftoverBitsToWrite;
+                bufferEmpty = false;
+            }
+        }
+        
+    }
+    if(!bufferEmpty){
+        for(unsigned int i = bufferIterator; i < 32 - bufferIterator; i++){
+                buffer[i] = false;
+        }   
+        outputFile.write( (char*)&buffer, sizeof(buffer) );
+    }
+}
+void writeCodeTable(ofstream &newFile, node* root, string str){
+    if (!root)
+        return;
+ 
+    if (!root->internal){
+        newFile << root->dataByte <<" "<< str <<" ";
+        #if DEBUG
+            cout<< root->dataByte <<" "<< str <<" ";
+        #endif
+    }
+ 
+    writeCodeTable(newFile,root->left, str + "0");
+    writeCodeTable(newFile, root->right, str + "1");
+}
+
+void printCodes(node* root, string str)
+{
+    if (!root)
+        return;
+ 
+    if (!root->internal)
+        cout << root->dataByte << ": " << str << "\n";
+ 
+    printCodes(root->left, str + "0");
+    printCodes(root->right, str + "1");
 }
 
 void insertInSortedTupleVector(tuple_vector &sortedTupleVector, unsigned int value){
@@ -243,9 +413,5 @@ void eraseInSortedTupleVector(tuple_vector &sortedTupleVector, unsigned int valu
             }
         }
     }
-
-}
-
-void linkNodesToHeadNode(node* head, node* left, node* right){
 
 }

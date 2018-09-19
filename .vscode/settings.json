@@ -32,7 +32,9 @@
         "utility": "cpp",
         "unordered_map": "cpp",
         "string_view": "cpp",
-        "deque": "cpp"
+        "deque": "cpp",
+        "list": "cpp",
+        "sstream": "cpp"
     },
     "terminal.integrated.shell.windows": "cmd.exe"
 }
