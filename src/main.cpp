@@ -9,6 +9,7 @@ using namespace std;
 #include <stack>          
 #include <unordered_map>   
 #include <bitset>   
+#include <queue>   
 
 #define DEBUG 1
 
@@ -54,6 +55,8 @@ void makeMap(node* rootNode, string str, unordered_map<unsigned char, string> &m
 
 void writeEncodedFile(node* root, ifstream &inputFile, ofstream &outputFile, unordered_map<unsigned char, string> map);
 void writeCodeTable(ofstream &newFile, node* root, string str);
+
+void decodeEncodedFile(ifstream &inputFile, node* root );
 
 int main(int argc, char* argv[]) {
     ifstream inputFile;
@@ -112,6 +115,11 @@ int encodeText(ifstream &inputFile){
     outputFile.open("output.dat",ios_base::binary);
     writeEncodedFile(rootNode, inputFile, outputFile, mapOfCode);
     outputFile.close();
+
+    ifstream encodedFile;
+    encodedFile.open("output.dat",ios_base::binary);
+    decodeEncodedFile(encodedFile, rootNode);
+    encodedFile.close();
     return 0;
 }
 
@@ -327,7 +335,7 @@ void writeEncodedFile(node* root, ifstream &inputFile, ofstream &outputFile, uno
         }
 
         #if DEBUG
-            cout << "read" << readString << endl;
+            // cout << "read" << readString << endl;
         #endif
 
         if(reachedBufferBits){
@@ -414,4 +422,46 @@ void eraseInSortedTupleVector(tuple_vector &sortedTupleVector, unsigned int valu
         }
     }
 
+}
+
+void decodeEncodedFile(ifstream &inputFile, node* root ){
+    char readByte;
+    node* nodeIterator;
+
+    int leftOff = 0;
+
+    queue<bool> boolQueue;
+    bool reducedToValue = true;
+    while(inputFile){
+        if(boolQueue.empty()){
+            leftOff = 0;
+            inputFile.read(&readByte, 1);
+            for(int i = 0; i < 8; i++){
+                boolQueue.push((readByte >> i) & 1);
+            }
+        }
+    
+        if(reducedToValue){
+            nodeIterator = root;
+            reducedToValue = false;
+        }
+        for(int i = leftOff; i < 8; i++){
+            bool currentBool = boolQueue.front();
+            boolQueue.pop();
+            
+            if(currentBool == false)
+                nodeIterator = nodeIterator->left;
+            else
+                nodeIterator = nodeIterator->right;
+
+            if (!nodeIterator->internal){
+                cout << nodeIterator->dataByte;
+                reducedToValue = true;
+                leftOff = i;
+                break;
+            }
+            if(boolQueue.empty())
+                break;
+        }   
+    }
 }
