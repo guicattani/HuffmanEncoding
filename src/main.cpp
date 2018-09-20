@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
     }
     else if (argc < 3)
     {
-        fileName = argv[2];
+        fileName = argv[1];
     }
 
     inputFile.open(fileName);
@@ -423,6 +423,8 @@ void writeCodeTable(ofstream &newFile, node *root, string str)
 
 void decodeEncodedFile(ifstream &inputFile, node *root)
 {
+    ofstream outputFile;
+    outputFile.open("decoded.txt");
     char readByte;
     node *nodeIterator;
 
@@ -459,7 +461,8 @@ void decodeEncodedFile(ifstream &inputFile, node *root)
 
             if (!nodeIterator->internal)
             {
-                cout << nodeIterator->dataByte;
+                 
+                outputFile << nodeIterator->dataByte;
                 reducedToValue = true;
                 leftOff = i;
                 break;
@@ -468,5 +471,7 @@ void decodeEncodedFile(ifstream &inputFile, node *root)
                 break;
         }
     }
+
+    outputFile.close();
 }
 #pragma endregion
