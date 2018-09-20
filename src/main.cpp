@@ -70,15 +70,12 @@ int main(int argc, char* argv[]) {
     cCurrentPath[sizeof(cCurrentPath) - 1] = '\0';
     cout << "The current working directory is "<< cCurrentPath << endl;
     
-    bool encodeOperation;
     if(argc < 2) {
         cout << "Type path to file: ";
         cin >> fileName;
     }
     else if(argc < 3){
         fileName = argv[2];
-        if(argc < 4)
-            encodeOperation = false;
     }
 
     inputFile.open (fileName);
@@ -285,8 +282,10 @@ node* makeHeap(tuple_vector &sortedTupleVector){
 }
 
 void writeEncodedFile(node* root, ifstream &inputFile, ofstream &outputFile, unordered_map<unsigned char, string> map){
-    //writeCodeTable(outputFile, root, "");
-    //outputFile << "\n";
+    ofstream codeFile;
+    codeFile.open("codeFile.dat", ios_base::binary);
+    writeCodeTable(codeFile, root, "");
+    codeFile.close();
 
     inputFile.clear();
     inputFile.seekg(0, ios::beg);
@@ -317,8 +316,9 @@ void writeEncodedFile(node* root, ifstream &inputFile, ofstream &outputFile, uno
             amountOfBitsToWrite = sizeOfReadString;
         }
 
-        for(unsigned int i = 0; i < amountOfBitsToWrite; i++){
-            if(readString[i] == '1')
+        int sharedIndex;
+        for(sharedIndex = 0; sharedIndex < amountOfBitsToWrite; sharedIndex++){
+            if(readString[sharedIndex] == '1')
                 buffer[bufferIterator] = true;
             else    
                 buffer[bufferIterator] = false;
@@ -327,7 +327,7 @@ void writeEncodedFile(node* root, ifstream &inputFile, ofstream &outputFile, uno
 
         if(activateSecondBuffer){
             for(unsigned int i = 0; i < leftoverBitsToWrite; i++){
-                if(readString[i] == '1')
+                if(readString[sharedIndex++] == '1')
                     bufferOfBuffer[i] = true;
                 else    
                     bufferOfBuffer[i] = false;
@@ -340,6 +340,11 @@ void writeEncodedFile(node* root, ifstream &inputFile, ofstream &outputFile, uno
 
         if(reachedBufferBits){
             outputFile.write( (char*)&buffer, sizeof(buffer) );
+            #ifdef DEBUG
+                string newStr = buffer.to_string();
+                reverse(newStr.begin(),newStr.end());
+                cout << newStr;
+            #endif
             bufferEmpty = true;
             reachedBufferBits = false;
             bufferIterator = 0;
@@ -347,6 +352,7 @@ void writeEncodedFile(node* root, ifstream &inputFile, ofstream &outputFile, uno
                 buffer = bufferOfBuffer;
                 bufferIterator = leftoverBitsToWrite;
                 bufferEmpty = false;
+                activateSecondBuffer = false;
             }
         }
         
@@ -363,13 +369,21 @@ void writeCodeTable(ofstream &newFile, node* root, string str){
         return;
  
     if (!root->internal){
-        newFile << root->dataByte <<" "<< str <<" ";
+        bitset<8> dataToBits = root->dataByte;
+        bitset<24> stringToBits;
+        newFile << dataToBits;
+
+        for(unsigned int i = 0; i < str.length(); i++){
+            stringToBits[i]=str[i];
+        }
+        newFile<<stringToBits;
+
         #if DEBUG
-            cout<< root->dataByte <<" "<< str <<" ";
+            cout<< dataToBits <<" "<< stringToBits << endl;
         #endif
     }
  
-    writeCodeTable(newFile,root->left, str + "0");
+    writeCodeTable(newFile, root->left, str + "0");
     writeCodeTable(newFile, root->right, str + "1");
 }
 
