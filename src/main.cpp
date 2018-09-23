@@ -44,7 +44,7 @@ typedef vector<tuple<unsigned int, unsigned char, bool>> tuple_vector;
 #pragma endregion
 
 #pragma region[Function headers]
-int encodeText(ifstream &inputFile);
+int encodeText(ifstream &inputFile, ofstream &outputFile);
 
 node *makeHeap(tuple_vector &sortedTupleVector);
 
@@ -61,25 +61,34 @@ void printCodes(node *root, string str);
 
 void writeEncodedFile(node *root, ifstream &inputFile, ofstream &outputFile, unordered_map<unsigned char, string> map);
 void writeCodeTable(ofstream &newFile, node *root, string str);
-void decodeEncodedFile(ifstream &inputFile, node *root);
+void decodeEncodedFile(ifstream &inputFile, ofstream &outputFile, node *root);
 #pragma endregion
 
 int main(int argc, char *argv[])
 {
     ifstream inputFile;
-    string fileName;
+    ofstream outputFile;
+    string inputFileName;
+    string outputFileName;
 
     if (argc < 2)
     {
         cout << "Type path to file: ";
-        cin >> fileName;
+        cin >> inputFileName;
     }
-    else if (argc < 3)
-    {
-        fileName = argv[1];
-    }
+    else
+        inputFileName = (string) argv[1];
 
-    inputFile.open(fileName);
+    if (argc > 2)
+        outputFileName = (string) argv[2];
+    else    
+    {
+        cout << "Type output file name: ";
+        cin >> outputFileName;
+    }
+    
+    outputFile.open(outputFileName);
+    inputFile.open(inputFileName);
 
     if (!inputFile)
     {
@@ -87,12 +96,12 @@ int main(int argc, char *argv[])
         return -2;
     }
 
-    unsigned int extensionMark = static_cast<unsigned int>(fileName.find_last_of('.'));
-    string extension = fileName.substr(extensionMark + 1, fileName.length());
+    unsigned int extensionMark = static_cast<unsigned int>(inputFileName.find_last_of('.'));
+    string extension = inputFileName.substr(extensionMark + 1, inputFileName.length());
 
     if (extension == "txt")
     {
-        encodeText(inputFile);
+        encodeText(inputFile,outputFile);
     }
     else
     {
@@ -104,7 +113,7 @@ int main(int argc, char *argv[])
 }
 
 #pragma region [Functions implementation]
-int encodeText(ifstream &inputFile){
+int encodeText(ifstream &inputFile, ofstream &outputFile){
     tuple_vector frequencyTupleVector = buildFrequencies(inputFile, 1);
     frequencyTupleVector = sortTupleVector(frequencyTupleVector);
 
@@ -112,15 +121,15 @@ int encodeText(ifstream &inputFile){
     unordered_map<unsigned char, string> mapOfCode;
     makeMap(rootNode, "", mapOfCode);
 
-    ofstream outputFile;
-    outputFile.open("output.dat", ios_base::binary);
-    writeEncodedFile(rootNode, inputFile, outputFile, mapOfCode);
-    outputFile.close();
-
-    ifstream encodedFile;
-    encodedFile.open("output.dat", ios_base::binary);
-    decodeEncodedFile(encodedFile, rootNode);
+    ofstream encodedFile;
+    encodedFile.open("encodedFile.dat", ios_base::binary);
+    writeEncodedFile(rootNode, inputFile, encodedFile, mapOfCode);
     encodedFile.close();
+
+    ifstream encodedFileDecode;
+    encodedFileDecode.open("encodedFile.dat", ios_base::binary);
+    decodeEncodedFile(encodedFileDecode, outputFile, rootNode);
+    encodedFileDecode.close();
     return 0;
 }
 
@@ -421,10 +430,8 @@ void writeCodeTable(ofstream &newFile, node *root, string str)
     writeCodeTable(newFile, root->right, str + "1");
 }
 
-void decodeEncodedFile(ifstream &inputFile, node *root)
+void decodeEncodedFile(ifstream &inputFile, ofstream &outputFile, node *root)
 {
-    ofstream outputFile;
-    outputFile.open("decoded.txt");
     char readByte;
     node *nodeIterator;
 
@@ -471,7 +478,5 @@ void decodeEncodedFile(ifstream &inputFile, node *root)
                 break;
         }
     }
-
-    outputFile.close();
 }
 #pragma endregion
