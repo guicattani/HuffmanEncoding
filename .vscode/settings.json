@@ -34,7 +34,8 @@
         "string_view": "cpp",
         "deque": "cpp",
         "list": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "bitset": "cpp"
     },
     "terminal.integrated.shell.windows": "cmd.exe"
 }
