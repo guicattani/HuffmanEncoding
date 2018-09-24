@@ -1,5 +1,5 @@
 CXX		  := g++
-CXX_FLAGS := -Wall -Wextra -std=c++17 -ggdb -Wno-unknown-pragmas
+CXX_FLAGS := -Wall -Wextra -std=c++17 -ggdb -Wno-unknown-pragmas -static-libstdc++
 
 BIN		:= bin
 SRC		:= src
@@ -16,7 +16,6 @@ run: clean all
 	./$(BIN)/$(EXECUTABLE)
 
 $(BIN)/$(EXECUTABLE): $(SRC)/*.cpp
-	$(CXX) $(CXX_FLAGS) -I$(INCLUDE) -L$(LIB) $^ -o $@ $(LIBRARIES) -static-libstdc++
-
+	$(CXX) $(CXX_FLAGS) -I$(INCLUDE) -L$(LIB) $^ -o $@ $(LIBRARIES) 
 clean:
 	-rm $(BIN)/*

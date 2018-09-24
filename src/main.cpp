@@ -46,7 +46,7 @@ typedef vector<tuple<unsigned int, unsigned char, bool>> tuple_vector;
 #pragma endregion
 
 #pragma region[Function headers]
-int encodeText(ifstream &inputFile, ofstream &outputFile);
+int encodeText(ifstream &inputFile);
 
 node *makeHeap(tuple_vector &sortedTupleVector);
 
@@ -63,8 +63,6 @@ void printCodes(node *root, string str);
 
 void writeEncodedFile(node *root, ifstream &inputFile, ofstream &outputFile, unordered_map<unsigned char, string> map);
 void writeCodeTable(ofstream &newFile, node *root, string str);
-node* recognizeCodeTable(ifstream &codeFile);
-void decodeEncodedFile(ifstream &inputFile, ofstream &outputFile, node *root);
 #pragma endregion
 
 int main(int argc, char *argv[])
@@ -89,8 +87,7 @@ int main(int argc, char *argv[])
         cout << "Type output file name: ";
         cin >> outputFileName;
     }
-    
-    outputFile.open(outputFileName);
+
     inputFile.open(inputFileName);
 
     if (!inputFile)
@@ -104,7 +101,7 @@ int main(int argc, char *argv[])
 
     if (extension == "txt")
     {
-        encodeText(inputFile,outputFile);
+        encodeText(inputFile);
     }
     else
     {
@@ -116,7 +113,7 @@ int main(int argc, char *argv[])
 }
 
 #pragma region [Functions implementation]
-int encodeText(ifstream &inputFile, ofstream &outputFile){
+int encodeText(ifstream &inputFile){
     tuple_vector frequencyTupleVector = buildFrequencies(inputFile, 1);
     frequencyTupleVector = sortTupleVector(frequencyTupleVector);
 
@@ -129,15 +126,6 @@ int encodeText(ifstream &inputFile, ofstream &outputFile){
     writeEncodedFile(rootNode, inputFile, encodedFile, mapOfCode);
     encodedFile.close();
 
-    ifstream readCodeFile;
-    readCodeFile.open("codeFile.dat", fstream::binary);
-    node* newRoot = recognizeCodeTable(readCodeFile);
-    readCodeFile.close();
-
-    ifstream encodedFileDecode;
-    encodedFileDecode.open("encodedFile.dat", ios_base::binary);
-    decodeEncodedFile(encodedFileDecode, outputFile, newRoot);
-    encodedFileDecode.close();
     return 0;
 }
 
@@ -443,133 +431,5 @@ void writeCodeTable(ofstream &newFile, node *root, string str)
 
     writeCodeTable(newFile, root->left, str + "0");
     writeCodeTable(newFile, root->right, str + "1");
-}
-
-node* recognizeCodeTable(ifstream &codeFile){
-    node *root = new node(0,0,true);
-    node *nodeIterator;
-
-    bitset<8> dataToBits;
-    bitset<5> sizeBits;
-    bitset<16> stringToBits;
-
-    char buffer[29];
-    int stringSize = 0;
-
-    while (codeFile.read((char *)&buffer,sizeof(buffer)))
-    {
-        nodeIterator = root;
-        for (int i = 0; i < 8; i++)
-        {
-            if(buffer[i] == '1')
-                dataToBits[7-i]=true;
-            else
-                dataToBits[7-i]=false;
-        }
-        int internalIndex = 4;
-        for (int i = 8; i < 13; i++)
-        {
-            if(buffer[i] == '1')
-                sizeBits[internalIndex--]=true;
-            else
-                sizeBits[internalIndex--]=false;
-        }
-        internalIndex = 15;
-        for (int i = 13; i < 29; i++)
-        {
-            if(buffer[i] == '1')
-                stringToBits[internalIndex--]=true;
-            else
-                stringToBits[internalIndex--]=false;
-        }
-
-        stringSize = static_cast<unsigned int>(sizeBits.to_ulong());
-
-        for(int i = 0; i < stringSize; i++){
-            if(stringToBits[i] == false){
-                if(!nodeIterator->left){
-                    if(i >= stringSize-1){
-                        unsigned char newChar = static_cast<unsigned char>(dataToBits.to_ulong());
-                        nodeIterator->left = new node(newChar,0, false);
-                    }
-                    else{
-                        nodeIterator->left = new node(0,0, true);
-                        nodeIterator = nodeIterator->left;
-                    }
-                }
-                else{
-                    nodeIterator = nodeIterator->left;
-                }
-            }
-            else{
-                if(!nodeIterator->right){
-                    if(i >= stringSize-1){
-                        unsigned char newChar = static_cast<unsigned char>(dataToBits.to_ulong());
-                        nodeIterator->right = new node(newChar,0, false);
-                    }
-                    else{
-                        nodeIterator->right = new node(0,0,true);
-                        nodeIterator = nodeIterator->right;
-                    }
-                }
-                else{
-                    nodeIterator = nodeIterator->right;
-                }
-            }
-        }
-    }
-
-    return root;
-}
-
-void decodeEncodedFile(ifstream &inputFile, ofstream &outputFile, node *root)
-{
-    
-    char readByte;
-    node *nodeIterator;
-
-    int leftOff = 0;
-
-    queue<bool> boolQueue;
-    bool reducedToValue = true;
-    while (inputFile)
-    {
-        if (boolQueue.empty())
-        {
-            leftOff = 0;
-            inputFile.read(&readByte, 1);
-            for (int i = 0; i < 8; i++)
-            {
-                boolQueue.push((readByte >> i) & 1);
-            }
-        }
-
-        if (reducedToValue)
-        {
-            nodeIterator = root;
-            reducedToValue = false;
-        }
-        for (int i = leftOff; i < 8; i++)
-        {
-            bool currentBool = boolQueue.front();
-            boolQueue.pop();
-
-            if (currentBool == false)
-                nodeIterator = nodeIterator->left;
-            else
-                nodeIterator = nodeIterator->right;
-
-            if (!nodeIterator->internal)
-            {
-                 
-                outputFile << nodeIterator->dataByte;
-                reducedToValue = true;
-                leftOff = i;
-                break;
-            }
-            if (boolQueue.empty())
-                break;
-        }
-    }
 }
 #pragma endregion
