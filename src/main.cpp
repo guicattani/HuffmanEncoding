@@ -417,7 +417,7 @@ void writeCodeTable(ofstream &newFile, node *root, string str)
         bitset<5> sizeBits = str.length();
         newFile << sizeBits;
 
-        bitset<16> stringToBits;
+        bitset<32> stringToBits;
         for (unsigned int i = 0; i < str.length(); i++)
         {
             if(str[i] == '1')

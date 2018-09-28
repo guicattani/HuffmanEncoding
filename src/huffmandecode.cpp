@@ -36,6 +36,7 @@ typedef vector<tuple<unsigned int, unsigned char, bool>> tuple_vector;
 int decodeExample(int argc, char *argv[]);
 node* recognizeCodeTable(ifstream &codeFile);
 void decodeEncodedFile(ifstream &codeTableFile, ofstream &outputFile, node *root);
+void printCodes(node *root, string str);
 
 int decodeExample(int argc, char *argv[])
 {
@@ -43,7 +44,7 @@ int decodeExample(int argc, char *argv[])
     string encodedFileName;
     string outputFileName;
 
-    if (argc == 1)
+    if (argc < 2)
     {
         cout << "Type path to code table dat file: ";
         cin >> codeTableFileName;
@@ -51,7 +52,7 @@ int decodeExample(int argc, char *argv[])
     else
         codeTableFileName = (string) argv[1];
 
-    if (argc == 2)
+    if (argc < 3)
     {
         cout << "Type path to encoded text dat file: ";
         cin >> encodedFileName;
@@ -59,13 +60,15 @@ int decodeExample(int argc, char *argv[])
     else
         encodedFileName = (string) argv[2];
 
-    if (argc == 3)
-        outputFileName = (string) argv[3];
-    else    
-    {
+    if (argc < 4){
         cout << "Type output file name: ";
         cin >> outputFileName;
     }
+    else    
+    {
+        outputFileName = (string) argv[3];
+    }
+
     
     ifstream codeTableFile;
     codeTableFile.open(codeTableFileName);
@@ -94,11 +97,25 @@ int decodeExample(int argc, char *argv[])
     readCodeFile.close();
     codeTableFile.close();
 
+    printCodes(newRoot, "");
+
     ifstream encodedFileDecode;
     encodedFileDecode.open(encodedFileName, ios_base::binary);
     decodeEncodedFile(encodedFileDecode, outputFile, newRoot);
     encodedFileDecode.close();
     return 0;
+}
+
+void printCodes(node *root, string str)
+{
+    if (!root)
+        return;
+
+    if (!root->internal)
+        cout << root->dataByte << ": " << str << "\n";
+
+    printCodes(root->left, str + "0");
+    printCodes(root->right, str + "1");
 }
 
 node* recognizeCodeTable(ifstream &codeFile){
@@ -107,9 +124,9 @@ node* recognizeCodeTable(ifstream &codeFile){
 
     bitset<8> dataToBits;
     bitset<5> sizeBits;
-    bitset<16> stringToBits;
+    bitset<32> stringToBits;
 
-    char buffer[29];
+    char buffer[45];
     int stringSize = 0;
 
     while (codeFile.read((char *)&buffer,sizeof(buffer)))
@@ -130,8 +147,8 @@ node* recognizeCodeTable(ifstream &codeFile){
             else
                 sizeBits[internalIndex--]=false;
         }
-        internalIndex = 15;
-        for (int i = 13; i < 29; i++)
+        internalIndex = 31;
+        for (int i = 13; i < 45; i++)
         {
             if(buffer[i] == '1')
                 stringToBits[internalIndex--]=true;
@@ -210,14 +227,25 @@ void decodeEncodedFile(ifstream &codeTableFile, ofstream &outputFile, node *root
             bool currentBool = boolQueue.front();
             boolQueue.pop();
 
-            if (currentBool == false)
+            if (currentBool == false){
+                if(nodeIterator->left == NULL)
+                    {
+                        cerr << "Invalid codeTable" << endl;
+                        return;
+                    }
                 nodeIterator = nodeIterator->left;
-            else
+            }
+            else{
+                if(nodeIterator->right == NULL)
+                {
+                    cerr << "Invalid codeTable" << endl;
+                    return;
+                }
                 nodeIterator = nodeIterator->right;
+            }
 
             if (!nodeIterator->internal)
             {
-                 
                 outputFile << nodeIterator->dataByte;
                 reducedToValue = true;
                 leftOff = i;
